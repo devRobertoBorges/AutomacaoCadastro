@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTOMAÇÃO UNIMED</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h2>AUTOMAÇÃO CÓDIGO BENEFICIÁRIO</h2>
+    <input type="file" id="fileInput" accept=".xls,.xlsx">
+    <button onclick="processarArquivo()">Processar</button>
+
+    <script>
+        function formatarNumero(numero) {
+            if (!numero) return ""; // Evita erro com valores vazios
+
+            // Converte o número para string e garante que tenha exatamente 16 dígitos
+            numero = numero.toString().padStart(16, "0");
+
+            // Divide a string nas partes específicas do número
+            let parte1 = numero.slice(0, 3);       // Primeiros 3 dígitos
+            let parte2 = numero.slice(3, 7);       // Próximos 4 dígitos
+
+            // Se o oitavo dígito for diferente de zero, pegamos mais um dígito para parte2
+            if (numero[7] !== '0') {
+                parte2 = numero.slice(3, 8); // 5 primeiros dígitos após a parte1
+            }
+
+            // Parte 3: os números restantes até o penúltimo grupo
+            let parte3 = numero.slice(parte2.length + 3, 14);
+
+            // Parte 4: os dois últimos dígitos
+            let parte4 = numero.slice(14, 16);
+
+            // Formata o número como desejado: "xxx.xxxx.xxxxxxx-xx"
+            return `${parte1}.${parte2}.${parte3}-${parte4}`;
+}
+
+        function processarArquivo() {
+            let input = document.getElementById("fileInput");
+            let file = input.files[0];
+
+            if (!file) {
+                alert("Selecione um arquivo XLS primeiro!");
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.readAsBinaryString(file);
+            reader.onload = function (e) {
+                let data = e.target.result;
+                let workbook = XLSX.read(data, { type: "binary" });
+
+                let sheetName = workbook.SheetNames[0];
+                let sheet = workbook.Sheets[sheetName];
+
+                let jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                console.log("Dados Lidos da Planilha:", jsonData); // Depuração
+
+                // Garante que cada linha tenha um número válido
+                let formattedData = jsonData
+                    .filter(row => row[0]) // Remove linhas vazias
+                    .map(row => [formatarNumero(row[0])]);
+
+                console.log("Números Formatados:", formattedData); // Depuração
+
+                if (formattedData.length === 0) {
+                    alert("Nenhum número válido encontrado no arquivo.");
+                    return;
+                }
+
+                let newSheet = XLSX.utils.aoa_to_sheet([["Número Formatado"], ...formattedData]);
+                let newWorkbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(newWorkbook, newSheet, "Formatados");
+
+                // Gera o arquivo XLS para download
+                XLSX.writeFile(newWorkbook, "numeros_formatados.xlsx");
+            };
+        }
+    </script>
+</body>
+</html>
